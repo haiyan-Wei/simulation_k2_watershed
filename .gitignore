@@ -1,0 +1,5 @@
+archive/
+outputs/
+.venv/
+_pycache_/
+inputs/

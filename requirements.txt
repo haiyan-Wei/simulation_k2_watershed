@@ -1,0 +1,10 @@
+# Core data / numerics
+pandas
+numpy
+scipy
+
+# Geospatial (rainfall animation)
+geopandas
+shapely
+matplotlib
+openpyxl
