@@ -41,11 +41,12 @@ def get_k2_results_outlet(outfile):
     # not reported by k2 when zero -> default 0
     runoff_mm, infil_chan_mm, infil_plane_mm, sedi_tonha = 0., 0., 0., 0.
     # always reported -> NaN means the file is incomplete
-    area_ha, rain_mm, peak_mmhr, sedi_kg = [np.nan] * 4
+    area_ha, rain_mm, peak_mmhr, tp_min, sedi_kg = [np.nan] * 5
 
     for line in lines[-50:]:
         if 'Peak flow =' in line:
             peak_mmhr = get_float_from_string(line, 1)
+            tp_min = get_float_from_string(line, 2)
         if 'Rainfall' in line and 'mm' in line:   # includes interception
             rain_mm = get_float_from_string(line, 0)
         if 'Outflow' in line:
@@ -68,6 +69,7 @@ def get_k2_results_outlet(outfile):
                           'sim_rain_mm': rain_mm,
                           'sim_runoff_mm': runoff_mm,
                           'sim_peak_mmhr': peak_mmhr,
+                          'sim_time_to_peak_min': tp_min,
                           'sim_sedi_kg': sedi_kg,
                           'sim_infil_plane_mm': infil_plane_mm,
                           'sim_infil_chan_mm': infil_chan_mm,

@@ -44,11 +44,11 @@ def setup_style(target='journal'):
         # Larger fonts to stay legible against a big (e.g. 15-inch) canvas,
         # and an opaque white background so figures don't vanish in dark IDEs.
         base.update({
-            'axes.labelsize': 18,
-            'xtick.labelsize': 14,
-            'ytick.labelsize': 14,
-            'legend.fontsize': 14,
-            'axes.titlesize': 20,
+            'axes.labelsize': 13,
+            'xtick.labelsize': 11,
+            'ytick.labelsize': 11,
+            'legend.fontsize': 11,
+            'axes.titlesize': 15,
             'figure.facecolor': 'white',
             'figure.dpi': 110,
         })

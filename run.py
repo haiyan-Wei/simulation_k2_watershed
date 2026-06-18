@@ -8,12 +8,15 @@ from utils import log_variables, create_loginfo_file
 from plots import setup_style
 
 
-# this code was used for LH Paper
-
 watershed = 104
-out = f'{watershed}_v6'
+out = f'{watershed}_v9'
 rain_type='gauge'  # default 
 
+# variables to evaluate (obs vs sim scatter plots and indicators)
+# available: 'runoff_mm', 'peak_mmhr', 'sedi_tonha', 'time_to_peak_min'
+eval_variables = ['runoff_mm', 'peak_mmhr', 'time_to_peak_min', 'sedi_tonha']
+eval_variables = ['runoff_mm', 'peak_mmhr']
+eval_variables = ['runoff_mm', 'peak_mmhr', 'time_to_peak_min']
 
 # event table
 edc_output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'inputs', 
@@ -25,13 +28,16 @@ simuation_duration_variable = 'eventDurMin'
 simuation_duration_multiplier = 1.25
 simulation_timestep = 0.5
 
-# options
-plot_outlet_graph = True
-group_graphs_by_flag = False
-overwrite_existing_runs = False
+# par file
 parfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'inputs', 
                         'parfiles', f'{watershed}_head_channel_outleton.par')
 
+# options
+plot_event_graph = True
+group_event_graphs_by_flag = True
+overwrite_existing_runs = False
+
+# graph style
 figure_style = 'screen'    # 'journal': paper styling, saves PDF+PNG; 'screen': preview
 
 def main():
@@ -57,8 +63,8 @@ def main():
                                 'watershed': watershed,
                                 'out': out,
                                 'flag_col': flag_col,
-                                'plot_outlet_graph': plot_outlet_graph,
-                                'group_graphs_by_flag': group_graphs_by_flag,
+                                'plot_event_graph': plot_event_graph,
+                                'group_event_graphs_by_flag': group_event_graphs_by_flag,
                                 'simulation_timestep': simulation_timestep,
                                 'simuation_duration_variable': simuation_duration_variable,
                                 'simuation_duration_multiplier': simuation_duration_multiplier,
@@ -72,8 +78,9 @@ def main():
                         simuation_duration_multiplier, simuation_duration_variable,
                         simulation_timestep,
                         rain_type=rain_type, flag_col=flag_col,
-                        plot_outlet_graph=plot_outlet_graph,
-                        group_graphs_by_flag=group_graphs_by_flag,
+                        eval_variables=eval_variables,
+                        plot_event_graph=plot_event_graph,
+                        group_event_graphs_by_flag=group_event_graphs_by_flag,
                         overwrite=overwrite_existing_runs)
 
     print('Done.')

@@ -27,7 +27,7 @@ def get_indicators(sim, obs):
             PBIAS = pbias(sim, obs)
             RSR = rsr(sim, obs)
             R2 = r2(sim, obs)
-            NS = ns(sim, obs)
+            NS = nse(sim, obs)
             RMSE = rmse(sim, obs)
             KGE = kge(sim, obs)
             OF = (1 - NS) + (1 - R2) + np.abs(PBIAS) / 100. + RMSE + RSR
@@ -55,7 +55,7 @@ def rmse(sim, obs):
     return np.sqrt(np.mean((sim - obs)**2))
 
 
-def ns(sim, obs):
+def nse(sim, obs):
     """calculate Nash-Sutcliffe Efficiency"""
     return 1 - sum((sim - obs)**2) / sum((obs - np.mean(obs))**2)
 

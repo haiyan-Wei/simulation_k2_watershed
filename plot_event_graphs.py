@@ -209,6 +209,7 @@ def plot_events_obs_sim(event_graph_dir, events, outletfiles, obs_dir,
         simulation results are skipped. pure post-processing: never
         invokes K2, safe to rerun for replotting. """
 
+    logging.info('\n\n=== Plot event graphs ===\n\n')
     n_ok, n_skipped, n_failed = 0, 0, 0
 
     for i, (event, outletfile) in enumerate(zip(events, outletfiles)):
@@ -225,20 +226,45 @@ def plot_events_obs_sim(event_graph_dir, events, outletfiles, obs_dir,
             simRunoff = df_sim.loc[event, 'sim_runoff_mm']
             simRain = df_sim.loc[event, 'sim_rain_mm']
 
+            # --- simulated outlet file
+            if not os.path.exists(outletfile):
+                logging.warning(f'{event}: outlet sim file not found, skipping plot')
+                n_skipped += 1
+                continue
             df_outlet = pd.read_csv(outletfile, skiprows=2,
                                     header=None, usecols=[0, 1, 2, 4])
             df_outlet.columns = ['elapsedtime', 'rainfallrate',
                                  'runoffrate', 'sediment']
 
-            df_obsRunoff = pd.read_csv(f'{obs_dir}/{event}_runoff.csv')
-            df_obsRunoff = df_obsRunoff[
-                ['elapsedTime', 'runoffRate_DAP', 'runCode', 'accDepth']]
+            # --- observed runoff
+            _OBS_RUNOFF_COLS = ['elapsedTime', 'runoffRate_DAP', 'runCode', 'accDepth']
+            obs_runoff_file = f'{obs_dir}/{event}_runoff.csv'
+            if not os.path.exists(obs_runoff_file):
+                logging.warning(f'{event}: observed runoff file not found, runoff not plotted')
+                df_obsRunoff = pd.DataFrame(columns=_OBS_RUNOFF_COLS)
+            else:
+                df_obsRunoff = pd.read_csv(obs_runoff_file)
+                if 'runoffRate_DAP' not in df_obsRunoff.columns or df_obsRunoff['runoffRate_DAP'].isna().all():
+                    logging.warning(f'{event}: no valid data in runoffRate_DAP, runoff not plotted')
+                    df_obsRunoff = pd.DataFrame(columns=_OBS_RUNOFF_COLS)
+                else:
+                    df_obsRunoff = df_obsRunoff[_OBS_RUNOFF_COLS]
 
+            # --- observed rainfall
             if rain_type == 'gauge':
-                df_obsRain = pd.read_csv(f'{obs_dir}/{event}_rainfall.csv')
-                df_obsRain = df_obsRain[
-                    ['gauge', 'elapsedTime', 'intensityCode_a', 'rainCode',
-                     'rainRate', 'accDepth']]
+                _OBS_RAIN_COLS = ['gauge', 'elapsedTime', 'intensityCode_a',
+                                  'rainCode', 'rainRate', 'accDepth']
+                obs_rain_file = f'{obs_dir}/{event}_rainfall.csv'
+                if not os.path.exists(obs_rain_file):
+                    logging.warning(f'{event}: observed rainfall file not found, rainfall not plotted')
+                    df_obsRain = pd.DataFrame(columns=_OBS_RAIN_COLS)
+                else:
+                    df_obsRain = pd.read_csv(obs_rain_file)
+                    if 'rainRate' not in df_obsRain.columns or df_obsRain['rainRate'].isna().all():
+                        logging.warning(f'{event}: no valid data in rainRate, rainfall not plotted')
+                        df_obsRain = pd.DataFrame(columns=_OBS_RAIN_COLS)
+                    else:
+                        df_obsRain = df_obsRain[_OBS_RAIN_COLS]
             else:
                 raise ValueError(f'unknown rain_type "{rain_type}"')
 
@@ -266,6 +292,7 @@ def group_figures_by_flag(event_graph_dir, df_event, flag_col):
         subfolders are cleared first so regrouping after flag changes
         leaves no stale copies. does nothing if flag_col is None/missing. """
 
+    
     if not flag_col:
         return
     if flag_col not in df_event.columns:
@@ -273,6 +300,7 @@ def group_figures_by_flag(event_graph_dir, df_event, flag_col):
                      f'figures not grouped')
         return
 
+    logging.info('\n\n=== Grouping event graphs ===\n\n')
     # clear previous grouping so a figure can't linger under an old flag
     for d in os.listdir(event_graph_dir):
         old = os.path.join(event_graph_dir, d)
@@ -302,7 +330,7 @@ def group_figures_by_flag(event_graph_dir, df_event, flag_col):
 # the per-event figure
 # ----------------------------------------------------------------------------
 
-def plot_single_event_obs_sim  (fig_dir, event, watershed, df_obsRunoff,
+def plot_single_event_obs_sim(fig_dir, event, watershed, df_obsRunoff,
                                df_obsRain, df_outlet, simRunoff, simRain,
                                obsRunoff, df_obsSedi=None,
                                show_acc_rain=False):

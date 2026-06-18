@@ -10,7 +10,7 @@ from plot_event_graphs import plot_events_obs_sim, group_figures_by_flag
 from plot_performance import create_obs_sim_plots_log_indicators
 
 
-def _check_parfile_outlet_print(parfile_path, plot_outlet_graph):
+def _check_parfile_outlet_print(parfile_path, plot_event_graph):
 
     """ verify the LAST element in the parfile (the outlet, a channel) has
         PRINT = 3, so K2 writes the outlet time series to OUTLET.SIM.
@@ -40,12 +40,10 @@ def _check_parfile_outlet_print(parfile_path, plot_outlet_graph):
 
     
     n_planes = sum(1 for etype, _ in elements if etype == 'PLANE')
-    n_channels = sum(1 for etype, _ in elements if etype == 'CHANNEL')
-    msg = (f'parfile {os.path.split(parfile_path)[1]}: '
-           f'{n_planes} plane and {n_channels} channel elements')
-    logging.info(msg)
+    n_channels = sum(1 for etype, _ in elements if etype == 'CHANNEL')    
+    logging.info(f'{n_planes} plane and {n_channels} channel elements from input parfile')
 
-    if plot_outlet_graph:
+    if plot_event_graph:
         last_type, last_print = elements[-1]
 
         if last_type != 'CHANNEL':
@@ -54,9 +52,9 @@ def _check_parfile_outlet_print(parfile_path, plot_outlet_graph):
 
         if last_print != 3:
             raise ValueError(
-                f'plot_outlet_graph is on, but the last element has PRINT = {last_print}. '
+                f'plot_event_graph is on, but the last element has PRINT = {last_print}. '
                 f'It must be PRINT = 3 for K2 to write the outlet time series '
-                f'Edit the parfile or set plot_outlet_graph = False.')
+                f'Edit the parfile or set plot_event_graph = False.')
 
 
 def _load_events(wspace, event_table, sheet_name):
@@ -65,7 +63,6 @@ def _load_events(wspace, event_table, sheet_name):
         and rename observed variables to standard names """
 
     shutil.copyfile(event_table, f'{wspace}/{os.path.split(event_table)[-1]}')
-    logging.info('A copy of the event table is saved in the output folder')
 
     if event_table.endswith('.csv'):
         df = pd.read_csv(event_table).set_index('event')
@@ -85,11 +82,47 @@ def _load_events(wspace, event_table, sheet_name):
     return df
 
 
+def _stage_inputs(wspace, event_table, sheet_name, k2pool_dir, parfile_path, pre_dir, plot_event_graph):
+
+    """ load event table, copy parfile and matching pre files to k2pool_dir.
+        logs event count and warns about any missing pre files. """
+
+    logging.info("\n=== Check and copy input files ===\n")
+    df_input_events = _load_events(wspace, event_table, sheet_name)
+    logging.info(f'{len(df_input_events)} events loaded from event table')
+
+    parfile = os.path.split(parfile_path)[1]
+    shutil.copy(parfile_path, k2pool_dir / parfile)
+    _check_parfile_outlet_print(parfile_path, plot_event_graph)
+
+    valid_events = []
+    for event in df_input_events.index:
+        src = Path(pre_dir) / f'{event}.pre'
+        if src.exists():
+            shutil.copy(src, k2pool_dir / f'{event}.pre')
+            valid_events.append(event)
+        else:
+            logging.warning(f'missing pre file for event {event}')
+
+    missing = df_input_events.index.difference(valid_events)
+    if not missing.empty:
+        logging.warning(
+            f'event table trimmed from {len(df_input_events)} to {len(valid_events)} events '
+            f'-- {len(missing)} event(s) dropped due to missing pre files: {list(missing)}')
+        df_input_events = df_input_events.loc[valid_events]
+
+    logging.info(f'A copy of the event table, parfile, and {len(valid_events)} prefiles saved in output folder. '
+                 f'{len(valid_events)} events will be simulated.')
+
+    return df_input_events, parfile
+
+
 def simulate_watershed(wspace, watershed, parfile_path, event_table, sheet_name,
                        pre_dir, obs_dir, k2_exe, dur_mp, dur_var, timestep,
                        rain_type='gauge', flag_col=None,
-                       plot_outlet_graph=True,
-                       group_graphs_by_flag=True,
+                       eval_variables=None,
+                       plot_event_graph=True,
+                       group_event_graphs_by_flag=True,
                        indicators_by_flag=False,
                        overwrite=False, figure_style='screen'):
 
@@ -99,20 +132,14 @@ def simulate_watershed(wspace, watershed, parfile_path, event_table, sheet_name,
         plots and indicators. set indicators_by_flag=True to also compute
         indicators separately for each unique flag value. """
 
-    # validate parfile before doing any work
-    _check_parfile_outlet_print(parfile_path, plot_outlet_graph)
-
     # --- set up directories
     wspace = Path(wspace)
     k2pool_dir = wspace / 'k2pool'
     os.makedirs(k2pool_dir, exist_ok=True)
 
-    # --- load events, stage inputs
-    df_input_events = _load_events(wspace, event_table, sheet_name)
-
-    parfile = os.path.split(parfile_path)[1]
-    shutil.copy(parfile_path, f'{k2pool_dir}/{parfile}')
-    shutil.copytree(pre_dir, k2pool_dir, dirs_exist_ok=True)
+    # --- load events, stage inputs, validate parfile
+    df_input_events, parfile = _stage_inputs(
+        wspace, event_table, sheet_name, k2pool_dir, parfile_path, pre_dir, plot_event_graph)
 
     # --- simulation file names and durations
     events = df_input_events.index
@@ -126,9 +153,9 @@ def simulate_watershed(wspace, watershed, parfile_path, event_table, sheet_name,
     simulation_durations = df_input_events[dur_var].values * dur_mp
 
     outletfiles = None
-    if plot_outlet_graph:
+    if plot_event_graph:
         outletfiles = [f'{k2pool_dir}/outlet_{e}.sim' for e in events]
-        event_graph_dir = f'{wspace}/event_graphs '
+        event_graph_dir = f'{wspace}/event_graphs'
         os.makedirs(event_graph_dir, exist_ok=True)
 
 
@@ -146,10 +173,10 @@ def simulate_watershed(wspace, watershed, parfile_path, event_table, sheet_name,
     print('Simulations Done')
     
     # --- per-event figures (post-processing, reads files only)
-    if plot_outlet_graph:
+    if plot_event_graph:
         plot_events_obs_sim(event_graph_dir, events, outletfiles, obs_dir,
                             pre_dir, df_input_events, df_sim_results, watershed, rain_type)
-        if group_graphs_by_flag:
+        if group_event_graphs_by_flag:
             group_figures_by_flag(event_graph_dir, df_input_events, flag_col)
 
     # --- merge simulation results with the event table
@@ -163,7 +190,8 @@ def simulate_watershed(wspace, watershed, parfile_path, event_table, sheet_name,
     df_results.to_csv(wspace / 'simulation_results.csv')
 
     # --- evaluation plots and indicators
-    df_indicator = create_obs_sim_plots_log_indicators(wspace, df_results, watershed, 'all')
+    df_indicator = create_obs_sim_plots_log_indicators(
+        wspace, df_results, watershed, 'all', eval_variables=eval_variables)
 
     if indicators_by_flag and flag_col and flag_col in df_results.columns:
         for flag, df_flag in df_results.groupby(flag_col, dropna=False):
@@ -171,7 +199,7 @@ def simulate_watershed(wspace, watershed, parfile_path, event_table, sheet_name,
             if len(df_flag) > 2:
                 logging.info(f'\nresults for {tag} events')
                 df_indicator_ = create_obs_sim_plots_log_indicators(
-                    wspace, df, watershed, tag)
+                    wspace, df_flag, watershed, tag, eval_variables=eval_variables)
                 df_indicator = pd.concat([df_indicator, df_indicator_])
 
     df_indicator.to_excel(f'{wspace}/df_indicator.xlsx')
