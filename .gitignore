@@ -1,5 +1,5 @@
 archive/
 outputs/
 .venv/
-_pycache_/
+__pycache__
 inputs/
